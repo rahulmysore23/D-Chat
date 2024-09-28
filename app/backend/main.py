@@ -67,28 +67,58 @@ def fetch_files_from_pinata():
         })
     return files
 
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 def sync_files_with_s3():
     """Sync Pinata files with S3 bucket."""
+    logger.info("Starting sync process")
     files = fetch_files_from_pinata()
+    logger.info(f"Fetched {len(files)} files from Pinata")
+
     for file in files:
+        file_name = file['name']
         file_content = file['content'].encode('utf-8')
-        file_md5 = hashlib.md5(file_content).hexdigest()
+
+        # Log the size of the content
+        local_size = len(file_content)
+        logger.info(f"Processing file: {file_name} (Size: {local_size} bytes)")
 
         try:
-            # Check if file exists in S3 and compare MD5
-            s3_object = s3_client.head_object(Bucket=S3_BUCKET_NAME, Key=file['name'])
-            s3_md5 = s3_object['ETag'].strip('"')
+            # Check if file exists in S3
+            try:
+                s3_object = s3_client.head_object(Bucket=S3_BUCKET_NAME, Key=file_name)
+                s3_etag = s3_object['ETag'].strip('"')
+                s3_size = s3_object['ContentLength']
+                logger.info(f"S3 ETag: {s3_etag}, Size: {s3_size} bytes")
+            except ClientError as e:
+                if e.response['Error']['Code'] == '404':
+                    logger.info(f"File {file_name} not found in S3. Uploading new file.")
+                    s3_etag = None
+                    s3_size = 0
+                else:
+                    logger.error(f"Error accessing S3 for {file_name}: {e}")
+                    continue
 
-            if file_md5 != s3_md5:
-                print(f"Updating {file['name']} in S3...")
-                s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=file['name'], Body=file_content)
-        except ClientError as e:
-            if e.response['Error']['Code'] == '404':
-                # File doesn't exist in S3, upload it
-                print(f"Uploading new file {file['name']} to S3...")
-                s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=file['name'], Body=file_content)
-            else:
-                print(f"Error checking {file['name']} in S3: {e}")
+            # Compare sizes and content if sizes match
+            if s3_etag is not None and local_size == s3_size:
+                existing_s3_content = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=file_name)['Body'].read()
+                if existing_s3_content == file_content:
+                    logger.info(f"File {file_name} is up to date in S3.")
+                    continue
+            
+            # If we reach here, we need to upload/update
+            logger.info(f"Uploading/updating {file_name} in S3...")
+            s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=file_name, Body=file_content)
+            logger.info(f"File {file_name} uploaded/updated successfully.")
+
+        except Exception as e:
+            logger.error(f"Unexpected error processing {file_name}: {e}", exc_info=True)
+
+    logger.info("Sync process completed")
 
 def sync_knowledge_base():
     """Sync AWS Bedrock knowledge base."""
