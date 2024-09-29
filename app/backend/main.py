@@ -166,8 +166,8 @@ def sync_knowledge_base():
         print(f"Unexpected error syncing knowledge base: {e}")
 
 #  Sync files and knowledge base before starting the server
-# sync_files_with_s3()
-# sync_knowledge_base()
+sync_files_with_s3()
+sync_knowledge_base()
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
