@@ -82,6 +82,13 @@
             color: #ff0000;
             font-style: italic;
         }
+        .sources a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .sources a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -107,10 +114,18 @@
             if (isError) messageDiv.classList.add('error');
             messageDiv.textContent = content;
 
+            // if (sources.length > 0) {
+            //     const sourcesDiv = document.createElement('div');
+            //     sourcesDiv.classList.add('sources');
+            //     sourcesDiv.textContent = 'Sources: ' + sources.join(', ');
+            //     messageDiv.appendChild(sourcesDiv);
+            // }
             if (sources.length > 0) {
                 const sourcesDiv = document.createElement('div');
                 sourcesDiv.classList.add('sources');
-                sourcesDiv.textContent = 'Sources: ' + sources.join(', ');
+                sourcesDiv.innerHTML = 'Sources: ' + sources.map(source => 
+                    `<a href="${source}" target="_blank" rel="noopener noreferrer">${source}</a>`
+                ).join(', ');
                 messageDiv.appendChild(sourcesDiv);
             }
 
