@@ -58,7 +58,6 @@ bedrock = boto3.client('bedrock-agent',
 )
 
 
-
 def fetch_files_from_pinata():
     """Fetch files from Pinata and return their content."""
     url = "https://api.pinata.cloud/data/pinList"
@@ -104,8 +103,6 @@ def fetch_files_from_pinata():
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-
 
 
 def sync_files_with_s3():
@@ -167,10 +164,6 @@ def sync_files_with_s3():
     logger.info("Sync process completed")
 
 
-#  Sync files and knowledge base before starting the server
-sync_files_with_s3()
-
-
 def sync_knowledge_base():
     """Sync AWS Bedrock knowledge base."""
     try:
@@ -207,6 +200,11 @@ def sync_knowledge_base():
         print(f"Error starting ingestion job: {e}")
     except Exception as e:
         print(f"Unexpected error syncing knowledge base: {e}")
+
+
+#  Sync files and knowledge base before starting the server
+sync_files_with_s3()
+sync_knowledge_base()
 
 
 @app.route('/api/chat', methods=['POST'])
