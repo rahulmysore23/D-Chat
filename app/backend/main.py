@@ -4,6 +4,8 @@ import boto3
 import hashlib
 import time
 import requests
+import logging
+import urllib3
 from flask import Flask, request, jsonify
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
@@ -12,7 +14,10 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-import urllib3
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Load environment 
@@ -99,12 +104,6 @@ def fetch_files_from_pinata():
 
     return file_contents
 
-
-import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-
 def sync_files_with_s3():
     """Sync Pinata files with S3 bucket only if there are changes."""
     logger.info("Starting sync process")
@@ -118,6 +117,21 @@ def sync_files_with_s3():
         file_content = file['content'].encode('utf-8')
         local_size = len(file_content)
 
+        # Check if file exists in S3
+        try:
+            s3_object = s3_client.head_object(Bucket=S3_BUCKET_NAME, Key=file_name)
+            s3_etag = s3_object['ETag'].strip('"')
+            s3_size = s3_object['ContentLength']
+            s3_files[file_name] = (s3_etag, s3_size)  # Store ETag and size for comparison
+        except ClientError as e:
+            if e.response['Error']['Code'] == '404':
+                # File does not exist in S3, mark it for upload
+                s3_files[file_name] = (None, 0)
+                logger.info(f"File {file_name} not found in S3. Marking for upload.")
+                continue
+            else:
+                logger.error(f"Error accessing S3 for {file_name}: {e}")
+                continue
         # Check if file exists in S3
         try:
             s3_object = s3_client.head_object(Bucket=S3_BUCKET_NAME, Key=file_name)
@@ -205,7 +219,6 @@ def sync_knowledge_base():
 #  Sync files and knowledge base before starting the server
 sync_files_with_s3()
 sync_knowledge_base()
-
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
