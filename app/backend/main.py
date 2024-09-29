@@ -56,118 +56,115 @@ bedrock = boto3.client('bedrock-agent',
     region_name=os.getenv('AWS_REGION')
 )
 
+
+
 def fetch_files_from_pinata():
     """Fetch files from Pinata and return their content."""
-    url = "https://api.pinata.cloud/data/pinList?status=pinned"
+    url = "https://api.pinata.cloud/data/pinList"
     headers = {
         "Authorization": f"Bearer {PINATA_JWT}"
     }
-    response = requests.get(url, headers=headers, verify=False)
-    response.raise_for_status()
     
+    params = {
+        "status": "pinned",
+        "pageLimit": 100,  # Adjust the limit as needed (max is usually 1000)
+        "pageOffset": 0     # Start from the first page
+    }
+
     files = []
-    for item in response.json()['rows']:
+    
+    while True:
+        response = requests.get(url, headers=headers, params=params, verify=False)
+        response.raise_for_status()
+        
+        data = response.json()
+        files.extend(data['rows'])
+
+        # Check if we've received the maximum number of files and if we should continue
+        if len(data['rows']) < params['pageLimit']:  # Change 'limit' to 'pageLimit'
+            break  # Exit loop if no more files are returned
+        
+        # Update pageOffset for the next request
+        params['pageOffset'] += params['pageLimit']
+
+    # Fetch content for each file
+    file_contents = []
+    for item in files:
         file_url = f"https://gateway.pinata.cloud/ipfs/{item['ipfs_pin_hash']}"
         file_content = requests.get(file_url, verify=False).text
-        files.append({
+        file_contents.append({
             'name': item['metadata']['name'],
             'content': file_content
         })
-    return files
+
+    return file_contents
+
 
 import logging
-
-# Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
 def sync_files_with_s3():
-    """Sync Pinata files with S3 bucket."""
+    """Sync Pinata files with S3 bucket only if there are changes."""
     logger.info("Starting sync process")
     files = fetch_files_from_pinata()
     logger.info(f"Fetched {len(files)} files from Pinata")
 
+    # Keep track of files already in S3
+    s3_files = {}
     for file in files:
         file_name = file['name']
         file_content = file['content'].encode('utf-8')
-
-        # Log the size of the content
         local_size = len(file_content)
-        logger.info(f"Processing file: {file_name} (Size: {local_size} bytes)")
 
+        # Check if file exists in S3
         try:
-            # Check if file exists in S3
-            try:
-                s3_object = s3_client.head_object(Bucket=S3_BUCKET_NAME, Key=file_name)
-                s3_etag = s3_object['ETag'].strip('"')
-                s3_size = s3_object['ContentLength']
-                logger.info(f"S3 ETag: {s3_etag}, Size: {s3_size} bytes")
-            except ClientError as e:
-                if e.response['Error']['Code'] == '404':
-                    logger.info(f"File {file_name} not found in S3. Uploading new file.")
-                    s3_etag = None
-                    s3_size = 0
-                else:
-                    logger.error(f"Error accessing S3 for {file_name}: {e}")
-                    continue
+            s3_object = s3_client.head_object(Bucket=S3_BUCKET_NAME, Key=file_name)
+            s3_etag = s3_object['ETag'].strip('"')
+            s3_size = s3_object['ContentLength']
+            s3_files[file_name] = (s3_etag, s3_size)  # Store ETag and size for comparison
+        except ClientError as e:
+            if e.response['Error']['Code'] == '404':
+                # File does not exist in S3, mark it for upload
+                s3_files[file_name] = (None, 0)
+                logger.info(f"File {file_name} not found in S3. Marking for upload.")
+                continue
+            else:
+                logger.error(f"Error accessing S3 for {file_name}: {e}")
+                continue
 
-            # Compare sizes and content if sizes match
-            if s3_etag is not None and local_size == s3_size:
-                existing_s3_content = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=file_name)['Body'].read()
-                if existing_s3_content == file_content:
-                    logger.info(f"File {file_name} is up to date in S3.")
-                    continue
-            
-            # If we reach here, we need to upload/update
-            logger.info(f"Uploading/updating {file_name} in S3...")
+    # Compare and upload/update files only if there are changes
+    for file in files:
+        file_name = file['name']
+        file_content = file['content'].encode('utf-8')
+        local_size = len(file_content)
+
+        s3_etag, s3_size = s3_files[file_name]
+
+        # If file does not exist in S3, upload it
+        if s3_etag is None:
+            logger.info(f"Uploading {file_name} to S3...")
             s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=file_name, Body=file_content)
-            logger.info(f"File {file_name} uploaded/updated successfully.")
-
-        except Exception as e:
-            logger.error(f"Unexpected error processing {file_name}: {e}", exc_info=True)
+            logger.info(f"File {file_name} uploaded successfully.")
+            continue
+        
+        # If sizes match, check for content equality
+        if local_size == s3_size:
+            existing_s3_content = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=file_name)['Body'].read()
+            if existing_s3_content == file_content:
+                logger.info(f"File {file_name} is already up to date in S3.")
+                continue
+        
+        # If we reach here, we need to upload/update
+        logger.info(f"Uploading/updating {file_name} in S3...")
+        s3_client.put_object(Bucket=S3_BUCKET_NAME, Key=file_name, Body=file_content)
+        logger.info(f"File {file_name} uploaded/updated successfully.")
 
     logger.info("Sync process completed")
 
-def sync_knowledge_base():
-    """Sync AWS Bedrock knowledge base."""
-    try:
-        response = bedrock.start_ingestion_job(
-            knowledgeBaseId=KNOWLEDGE_BASE_ID,
-            dataSourceId=DATA_SOURCE_ID,
-        )
-        job_id = response['ingestionJob']['ingestionJobId']
-        print(f"Knowledge base sync started. Job ID: {job_id}")
-
-        # Wait for the ingestion job to complete
-        while True:
-            try:
-                job_status = bedrock.get_ingestion_job(
-                    dataSourceId=DATA_SOURCE_ID,
-                    knowledgeBaseId=KNOWLEDGE_BASE_ID,
-                    ingestionJobId=job_id
-                )['ingestionJob']['status']
-                
-                if job_status == 'COMPLETE':
-                    print("Knowledge base sync completed successfully.")
-                    break
-                elif job_status in ['FAILED', 'STOPPED']:
-                    print(f"Knowledge base sync {job_status}.")
-                    break
-                else:
-                    print(f"Knowledge base sync in progress. Status: {job_status}")
-                    time.sleep(5) 
-            except ClientError as e:
-                print(f"Error checking ingestion job status: {e}")
-                break
-
-    except ClientError as e:
-        print(f"Error starting ingestion job: {e}")
-    except Exception as e:
-        print(f"Unexpected error syncing knowledge base: {e}")
 
 #  Sync files and knowledge base before starting the server
 sync_files_with_s3()
-sync_knowledge_base()
+#sync_knowledge_base()
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
