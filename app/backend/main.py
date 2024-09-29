@@ -15,7 +15,8 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Load environment variables from .env file
+# Load environment 
+# variables from .env file
 load_dotenv()
 
 # AWS configurations
@@ -103,6 +104,10 @@ def fetch_files_from_pinata():
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+
+
+
 def sync_files_with_s3():
     """Sync Pinata files with S3 bucket only if there are changes."""
     logger.info("Starting sync process")
@@ -164,7 +169,45 @@ def sync_files_with_s3():
 
 #  Sync files and knowledge base before starting the server
 sync_files_with_s3()
-#sync_knowledge_base()
+
+
+def sync_knowledge_base():
+    """Sync AWS Bedrock knowledge base."""
+    try:
+        response = bedrock.start_ingestion_job(
+            knowledgeBaseId=KNOWLEDGE_BASE_ID,
+            dataSourceId=DATA_SOURCE_ID,
+        )
+        job_id = response['ingestionJob']['ingestionJobId']
+        print(f"Knowledge base sync started. Job ID: {job_id}")
+
+        # Wait for the ingestion job to complete
+        while True:
+            try:
+                job_status = bedrock.get_ingestion_job(
+                    dataSourceId=DATA_SOURCE_ID,
+                    knowledgeBaseId=KNOWLEDGE_BASE_ID,
+                    ingestionJobId=job_id
+                )['ingestionJob']['status']
+                
+                if job_status == 'COMPLETE':
+                    print("Knowledge base sync completed successfully.")
+                    break
+                elif job_status in ['FAILED', 'STOPPED']:
+                    print(f"Knowledge base sync {job_status}.")
+                    break
+                else:
+                    print(f"Knowledge base sync in progress. Status: {job_status}")
+                    time.sleep(5) 
+            except ClientError as e:
+                print(f"Error checking ingestion job status: {e}")
+                break
+
+    except ClientError as e:
+        print(f"Error starting ingestion job: {e}")
+    except Exception as e:
+        print(f"Unexpected error syncing knowledge base: {e}")
+
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
