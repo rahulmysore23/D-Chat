@@ -243,10 +243,21 @@ def chat():
 
         # Construct the prompt with retrieved information
         context = "\n".join(retrieved_passages)
-        prompt = f"""Based on the following information:\n\n{context}\n\nAnswer the question: {user_message}\n\nOnly use the information provided above to answer the question. If the information is not sufficient to answer the question, say so.
-        Always provider the output in the following structure - 
+        # prompt = f"""You are a human like assistant.
+        # Based on the following information:\n\n{context}\n\nAnswer the question: {user_message}\n\nOnly use the information provided above to answer the question.
+        # Always provider the output in the following structure - 
+        # ans: answer_here,
+        # sources: [list of href links from the retreived information (could be multiple)]
+        # """
+        prompt = f"""
+        You are a human-like assistant.
+        Based on the following information:\n\n{context}\n\nAnswer the question: {user_message}
+
+        If the information provided above doesn't help answer the question, respond as a friendly assistant, especially for greetings, small talk, or common phrases, if not answer only with a valid source.
+
+        Always provide the output in the following structure:
         ans: answer_here,
-        sources: [list of href links from the retreived information (could be multiple)]
+        sources: [list of href links from the retrieved information (could be multiple) or 'No specific sources for general knowledge' if no sources are applicable]
         """
 
         # Prepare the request body for Bedrock
