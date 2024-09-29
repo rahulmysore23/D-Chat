@@ -25,12 +25,12 @@
             flex-direction: column;
         }
         .chat-title {
-            background-color: #007bff; /* Title background color */
-            color: white; /* Title text color */
-            padding: 10px; /* Padding for title */
-            text-align: center; /* Center the title text */
-            border-top-left-radius: 10px; /* Rounded corners */
-            border-top-right-radius: 10px; /* Rounded corners */
+            background-color: #007bff;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
         }
         .chat-messages {
             flex-grow: 1;
@@ -73,11 +73,20 @@
             border-radius: 5px;
             cursor: pointer;
         }
+        .loading {
+            text-align: center;
+            color: #007bff;
+            margin-top: 10px;
+        }
+        .error {
+            color: #ff0000;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
     <div class="chat-container">
-        <div class="chat-title">Chatbot Assistant</div> <!-- Title added here -->
+        <div class="chat-title">Chatbot Assistant</div>
         <div class="chat-messages" id="chat-messages"></div>
         <div class="chat-input">
             <input type="text" id="user-input" placeholder="Type your message...">
@@ -89,11 +98,13 @@
         const chatMessages = document.getElementById('chat-messages');
         const userInput = document.getElementById('user-input');
         const sendButton = document.getElementById('send-button');
+        let isWaiting = false;
 
-        function addMessage(content, isUser = false, sources = []) {
+        function addMessage(content, isUser = false, sources = [], isError = false) {
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('message');
             messageDiv.classList.add(isUser ? 'user-message' : 'bot-message');
+            if (isError) messageDiv.classList.add('error');
             messageDiv.textContent = content;
 
             if (sources.length > 0) {
@@ -107,14 +118,30 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
+        function addLoadingIndicator() {
+            const loadingDiv = document.createElement('div');
+            loadingDiv.classList.add('loading');
+            loadingDiv.textContent = 'Thinking...';
+            loadingDiv.id = 'loading-indicator';
+            chatMessages.appendChild(loadingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function removeLoadingIndicator() {
+            const loadingDiv = document.getElementById('loading-indicator');
+            if (loadingDiv) loadingDiv.remove();
+        }
+
         async function sendMessage() {
             const message = userInput.value.trim();
-            if (message) {
+            if (message && !isWaiting) {
                 addMessage(message, true);
                 userInput.value = '';
+                isWaiting = true;
+                addLoadingIndicator();
 
                 try {
-                    const response = await fetch('/api/chat', {
+                    const response = await fetch('http://localhost:5000/api/chat', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -122,23 +149,40 @@
                         body: JSON.stringify({ message }),
                     });
 
+                    removeLoadingIndicator();
+
                     if (!response.ok) {
-                        throw new Error('Network response was not ok');
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
 
                     const data = await response.json();
                     addMessage(data.response, false, data.sources);
                 } catch (error) {
                     console.error('Error:', error);
-                    addMessage('Sorry, there was an error processing your request.', false);
+                    addMessage(`Error: ${error.message}`, false, [], true);
+                } finally {
+                    isWaiting = false;
                 }
             }
         }
 
-        sendButton.addEventListener('click', sendMessage);
+        const RATE_LIMIT_DELAY = 1000;
+        let lastMessageTime = 0;
+
+        async function rateLimitedSendMessage() {
+            const now = Date.now();
+            if (now - lastMessageTime < RATE_LIMIT_DELAY) {
+                addMessage("Please wait a moment before sending another message.", false, [], true);
+                return;
+            }
+            lastMessageTime = now;
+            await sendMessage();
+        }
+
+        sendButton.addEventListener('click', rateLimitedSendMessage);
         userInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                sendMessage();
+                rateLimitedSendMessage();
             }
         });
     </script>

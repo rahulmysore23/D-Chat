@@ -1,2 +1,5 @@
-.env
-myenv
+# Ignore all .env files in any directory
+**/.env
+
+# Ignore all venv folders in any directory 
+**/venv/
