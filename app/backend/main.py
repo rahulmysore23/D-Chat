@@ -192,7 +192,11 @@ def chat():
 
         # Construct the prompt with retrieved information
         context = "\n".join(retrieved_passages)
-        prompt = f"Based on the following information:\n\n{context}\n\nAnswer the question: {user_message}\n\nOnly use the information provided above to answer the question. If the information is not sufficient to answer the question, say so."
+        prompt = f"""Based on the following information:\n\n{context}\n\nAnswer the question: {user_message}\n\nOnly use the information provided above to answer the question. If the information is not sufficient to answer the question, say so.
+        Always provider the output in the following structure - 
+        ans: answer_here,
+        sources: [list of href links from the retreived information (could be multiple)]
+        """
 
         # Prepare the request body for Bedrock
         request_body = {
@@ -217,11 +221,24 @@ def chat():
         response_body = json.loads(response['body'].read())
         ai_response = response_body['content'][0]['text']
 
-        # Extract sources from the retrieved results
-        sources = [result['location']['s3Location']['uri'] for result in retrieve_response['retrievalResults']]
+        # Extract answer (everything after "ans:" and before "sources:")
+        ans_start = ai_response.find("ans:")
+        sources_start = ai_response.find("sources:")
+        
+        if ans_start != -1 and sources_start != -1:
+            answer = ai_response[ans_start + 4:sources_start].strip()
+        else:
+            answer = "Unable to parse answer correctly"
+
+        # Extract sources as a list
+        sources = []
+        if sources_start != -1:
+            sources_str = ai_response[sources_start + 8:].strip()
+            if sources_str.startswith('[') and sources_str.endswith(']'):
+                sources = [s.strip(' "[]') for s in sources_str[1:-1].split(',')]
 
         return jsonify({
-            'response': ai_response,
+            'response': answer,
             'sources': sources
         })
 
