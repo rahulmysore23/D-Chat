@@ -114,18 +114,14 @@
             if (isError) messageDiv.classList.add('error');
             messageDiv.textContent = content;
 
-            // if (sources.length > 0) {
-            //     const sourcesDiv = document.createElement('div');
-            //     sourcesDiv.classList.add('sources');
-            //     sourcesDiv.textContent = 'Sources: ' + sources.join(', ');
-            //     messageDiv.appendChild(sourcesDiv);
-            // }
             if (sources.length > 0) {
                 const sourcesDiv = document.createElement('div');
                 sourcesDiv.classList.add('sources');
-                sourcesDiv.innerHTML = 'Sources: ' + sources.map(source => 
-                    `<a href="${source}" target="_blank" rel="noopener noreferrer">${source}</a>`
-                ).join(', ');
+                sourcesDiv.innerHTML = 'Sources: ' + sources.map(source => {
+                    // Clean up the source URL
+                    const cleanSource = source.trim().replace(/^["'\s]+|["'\s]+$/g, '');
+                    return `<a href="${cleanSource}" target="_blank" rel="noopener noreferrer">${cleanSource}</a>`;
+                }).join(', ');
                 messageDiv.appendChild(sourcesDiv);
             }
 
