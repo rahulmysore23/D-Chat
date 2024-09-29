@@ -220,7 +220,6 @@ def chat():
         # Parse the response
         response_body = json.loads(response['body'].read())
         ai_response = response_body['content'][0]['text']
-        print(ai_response)
 
         # Extract answer (everything after "ans:" and before "sources:")
         ans_start = ai_response.find("ans:")
