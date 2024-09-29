@@ -7,14 +7,16 @@ import requests
 from flask import Flask, request, jsonify
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Load environment variables from .env file
 load_dotenv()
-
-app = Flask(__name__)
 
 # AWS configurations
 S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME')
@@ -31,6 +33,12 @@ PINATA_JWT = os.getenv('PINATA_JWT')
 
 # Initialize AWS clients using environment variables
 s3_client = boto3.client('s3',
+    aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
+    aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
+    region_name=os.getenv('AWS_REGION')
+)
+
+bedrock_agent_runtime = boto3.client('bedrock-agent-runtime',
     aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
     aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
     region_name=os.getenv('AWS_REGION')
@@ -167,7 +175,7 @@ def chat():
     
     try:
         # First, retrieve relevant information from the knowledge base
-        retrieve_response = bedrock.retrieve(
+        retrieve_response = bedrock_agent_runtime.retrieve(
             knowledgeBaseId=KNOWLEDGE_BASE_ID,
             retrievalQuery={
                 'text': user_message
@@ -180,8 +188,8 @@ def chat():
         )
 
         # Extract the retrieved passages
-        retrieved_passages = [result['content'] for result in retrieve_response['retrievalResults']]
-        
+        retrieved_passages = [result['content']['text'] if 'text' in result['content'] else str(result['content']) for result in retrieve_response['retrievalResults']]
+
         # Construct the prompt with retrieved information
         context = "\n".join(retrieved_passages)
         prompt = f"Based on the following information:\n\n{context}\n\nAnswer the question: {user_message}\n\nOnly use the information provided above to answer the question. If the information is not sufficient to answer the question, say so."
