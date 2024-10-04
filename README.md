@@ -1,4 +1,4 @@
-# D-chat
+# D-chat - USDA AI Challenge Winners
 
 D-chat is a cutting-edge decentralized chat application that combines the power of AWS cloud services with decentralized technologies to provide a secure, scalable, and intelligent communication platform.
 
