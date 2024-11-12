@@ -19,7 +19,7 @@ D-chat's architecture is designed for scalability, security, and performance:
 
 1. **Data Collection**
    - Utilizes Selenium, BeautifulSoup (BSoup), and Python for web scraping
-   - Targets USDA data sources for agricultural insights
+   - Targets UMKC ISAO  sources for Data sources
    - Processes and prepares data for decentralized storage
 
 2. **Decentralized Storage**
@@ -47,7 +47,7 @@ D-chat's architecture is designed for scalability, security, and performance:
 - Decentralized data storage using IPFS technology
 - AI-powered chat functionality leveraging Claude AI
 - Scalable and resilient AWS-based infrastructure
-- Integration of USDA agricultural data for informed discussions
+- Integration of UMKC ISAO data for informed discussions
 - Real-time communication with end-to-end encryption
 - Multi-platform support (web, mobile, desktop)
 - User authentication and authorization
