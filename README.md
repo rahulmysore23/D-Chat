@@ -15,7 +15,7 @@ D-chat is a cutting-edge decentralized chat application that combines the power 
 
 D-chat's architecture is designed for scalability, security, and performance:
 
-![Screenshot 2024-09-29 044955](https://github.com/user-attachments/assets/93da5494-571c-485f-aa15-af81fe40c41f)
+![Picture2](https://github.com/user-attachments/assets/6291c97a-5564-4937-a00c-1e7baee81169)
 
 1. **Data Collection**
    - Utilizes Selenium, BeautifulSoup (BSoup), and Python for web scraping
@@ -75,10 +75,13 @@ To get started with D-chat, ensure you have the following prerequisites:
 
 ## Demo
 
-![WhatsApp Image 2024-10-01 at 10 39 20 PM](https://github.com/user-attachments/assets/5fe71c3b-d242-48fd-8b38-d35078fd8383)
+![image](https://github.com/user-attachments/assets/c7a9f5ad-5c94-4006-9b98-aac1b6911b72)
 
-![WhatsApp Image 2024-10-01 at 10 40 20 PM](https://github.com/user-attachments/assets/d9b6755e-9c0b-404a-8fe7-3cd86e362c75)
+![WhatsApp Image 2024-11-11 at 22 40 08_bed29aa6](https://github.com/user-attachments/assets/bdd3774f-113b-47b9-9fe2-c2943e710609)
 
+![WhatsApp Image 2024-11-11 at 22 40 52_bc187d6d](https://github.com/user-attachments/assets/eaca8f4c-c96e-4cdd-b8cb-5bb093a1c781)
+
+![WhatsApp Image 2024-11-11 at 22 39 10_90900244](https://github.com/user-attachments/assets/3d294d08-7199-4f98-80f3-25e97d9b89b7)
 
 ## Contact
 
